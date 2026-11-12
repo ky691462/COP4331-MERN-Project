@@ -1,0 +1,389 @@
+openapi: 3.0.3
+info:
+  title: Impostor Game API
+  version: 1.0.0
+  description: |
+    API for **Impostor**, a party word game. Everyone in a room gets the same
+    secret word except one player, the impostor, who only knows the theme.
+    Players give clues out loud, then vote on who they think the impostor is.
+
+    1. `POST /register`, then click the link in the email (`POST /verify-email`).
+    2. `POST /login` returns a JWT. Click **Authorize** and paste it.
+    3. `POST /games` creates a lobby with a theme, others `POST /games/join`.
+    4. The host calls `/start`, then `/voting`; everyone calls `/vote`.
+       Clients poll `GET /games/{code}` every couple of seconds for updates.
+servers:
+  - url: https://hammrti.me/api
+    description: Production (DigitalOcean droplet)
+  - url: http://localhost:5000/api
+    description: Local development
+tags:
+  - name: Auth
+  - name: Themes
+  - name: Games
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  schemas:
+    Message:
+      type: object
+      properties:
+        message: { type: string, example: Only the host can do that. }
+    Theme:
+      type: object
+      properties:
+        id: { type: string, example: halloween }
+        name: { type: string, example: Halloween }
+        kind: { type: string, enum: [general, holiday] }
+        emoji: { type: string, example: 🎃 }
+        description: { type: string, example: Spooky season }
+        wordCount: { type: integer, example: 24 }
+        inSeason: { type: boolean, description: Holiday theme whose season is now }
+    Player:
+      type: object
+      properties:
+        userId: { type: string, example: 6650c2f1a3b4c5d6e7f80912 }
+        nickname: { type: string, example: Ana }
+        score: { type: integer, example: 2 }
+        isHost: { type: boolean }
+        hasVoted: { type: boolean, description: Only present while voting }
+    GameState:
+      type: object
+      description: The game as the logged-in player is allowed to see it.
+      properties:
+        code: { type: string, example: K7QPM }
+        status: { type: string, enum: [lobby, reveal, voting, results] }
+        round: { type: integer, example: 1 }
+        theme: { $ref: '#/components/schemas/Theme' }
+        hostId: { type: string }
+        minPlayers: { type: integer, example: 3 }
+        maxPlayers: { type: integer, example: 12 }
+        players:
+          type: array
+          items: { $ref: '#/components/schemas/Player' }
+        you:
+          type: object
+          properties:
+            userId: { type: string }
+            nickname: { type: string }
+            isHost: { type: boolean }
+            isImpostor: { type: boolean }
+            word: { type: string, nullable: true, example: Pumpkin, description: Null for the impostor }
+            vote: { type: string, nullable: true }
+        canStart: { type: boolean }
+        result:
+          type: object
+          nullable: true
+          description: Only during results
+          properties:
+            impostorId: { type: string }
+            impostorNickname: { type: string, example: Ben }
+            word: { type: string, example: Pumpkin }
+            caught: { type: boolean }
+            votes:
+              type: array
+              items:
+                type: object
+                properties:
+                  userId: { type: string }
+                  nickname: { type: string }
+                  votes: { type: integer }
+                  votedFor: { type: string, nullable: true }
+        updatedAt: { type: string, format: date-time }
+  parameters:
+    code:
+      name: code
+      in: path
+      required: true
+      description: Room code (not case-sensitive)
+      schema: { type: string, example: K7QPM }
+  responses:
+    Error:
+      description: Error
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Message' }
+    Game:
+      description: Updated game state
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/GameState' }
+
+paths:
+  /register:
+    post:
+      tags: [Auth]
+      summary: Create an account and email a verification link
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [firstName, lastName, email, password]
+              properties:
+                firstName: { type: string, example: Ana }
+                lastName: { type: string, example: Lopez }
+                email: { type: string, example: ana@example.com }
+                password:
+                  type: string
+                  example: Secret#123
+                  description: 8+ characters with upper, lower, number and special character
+      responses:
+        '201':
+          description: Created; verification email sent
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message: { type: string }
+                  userId: { type: string }
+                  emailSent: { type: boolean }
+        '400': { $ref: '#/components/responses/Error' }
+        '409': { $ref: '#/components/responses/Error' }
+  /verify-email:
+    post:
+      tags: [Auth]
+      summary: Verify an email with the token from the emailed link
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [token]
+              properties:
+                token: { type: string }
+      responses:
+        '200': { $ref: '#/components/responses/Error' }
+        '400': { $ref: '#/components/responses/Error' }
+  /resend-verification:
+    post:
+      tags: [Auth]
+      summary: Send a new verification link
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                email: { type: string, example: ana@example.com }
+      responses:
+        '200': { $ref: '#/components/responses/Error' }
+  /login:
+    post:
+      tags: [Auth]
+      summary: Log in (verified accounts only) and get a JWT
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, password]
+              properties:
+                email: { type: string, example: ana@example.com }
+                password: { type: string, example: Secret#123 }
+      responses:
+        '200':
+          description: Logged in
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message: { type: string }
+                  token: { type: string }
+                  user:
+                    type: object
+                    properties:
+                      id: { type: string }
+                      firstName: { type: string }
+                      lastName: { type: string }
+                      email: { type: string }
+        '401': { $ref: '#/components/responses/Error' }
+        '403':
+          description: Email not verified yet
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message: { type: string }
+                  needsVerification: { type: boolean, example: true }
+  /forgot-password:
+    post:
+      tags: [Auth]
+      summary: Email a password reset link
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                email: { type: string, example: ana@example.com }
+      responses:
+        '200': { $ref: '#/components/responses/Error' }
+  /reset-password:
+    post:
+      tags: [Auth]
+      summary: Set a new password with the token from the emailed link
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [token, password]
+              properties:
+                token: { type: string }
+                password: { type: string, example: NewPass#456 }
+      responses:
+        '200': { $ref: '#/components/responses/Error' }
+        '400': { $ref: '#/components/responses/Error' }
+
+  /themes:
+    get:
+      tags: [Themes]
+      summary: List word themes (holidays in season are featured)
+      responses:
+        '200':
+          description: Themes
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  themes:
+                    type: array
+                    items: { $ref: '#/components/schemas/Theme' }
+                  featured:
+                    type: array
+                    items: { type: string }
+                    example: [thanksgiving]
+
+  /games:
+    post:
+      tags: [Games]
+      summary: Create a lobby (you become the host)
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                theme: { type: string, example: halloween }
+                nickname: { type: string, example: Ana, description: Defaults to your first name }
+      responses:
+        '201': { $ref: '#/components/responses/Game' }
+        '400': { $ref: '#/components/responses/Error' }
+        '401': { $ref: '#/components/responses/Error' }
+  /games/join:
+    post:
+      tags: [Games]
+      summary: Join a lobby by room code
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [code]
+              properties:
+                code: { type: string, example: K7QPM }
+                nickname: { type: string, example: Ben }
+      responses:
+        '200': { $ref: '#/components/responses/Game' }
+        '404': { $ref: '#/components/responses/Error' }
+        '409': { $ref: '#/components/responses/Error' }
+  /games/{code}:
+    get:
+      tags: [Games]
+      summary: Current game state (poll this)
+      security: [{ bearerAuth: [] }]
+      parameters: [{ $ref: '#/components/parameters/code' }]
+      responses:
+        '200': { $ref: '#/components/responses/Game' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+  /games/{code}/theme:
+    put:
+      tags: [Games]
+      summary: Change the theme (host, between rounds)
+      security: [{ bearerAuth: [] }]
+      parameters: [{ $ref: '#/components/parameters/code' }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                theme: { type: string, example: animals }
+      responses:
+        '200': { $ref: '#/components/responses/Game' }
+        '403': { $ref: '#/components/responses/Error' }
+        '409': { $ref: '#/components/responses/Error' }
+  /games/{code}/start:
+    post:
+      tags: [Games]
+      summary: Start a round (host, 3+ players) — deals the word and picks the impostor
+      security: [{ bearerAuth: [] }]
+      parameters: [{ $ref: '#/components/parameters/code' }]
+      responses:
+        '200': { $ref: '#/components/responses/Game' }
+        '403': { $ref: '#/components/responses/Error' }
+        '409': { $ref: '#/components/responses/Error' }
+  /games/{code}/voting:
+    post:
+      tags: [Games]
+      summary: Clues are done — open voting (host)
+      security: [{ bearerAuth: [] }]
+      parameters: [{ $ref: '#/components/parameters/code' }]
+      responses:
+        '200': { $ref: '#/components/responses/Game' }
+        '409': { $ref: '#/components/responses/Error' }
+  /games/{code}/vote:
+    post:
+      tags: [Games]
+      summary: Vote for who you think the impostor is
+      description: When everyone has voted, the round ends and results are shown.
+      security: [{ bearerAuth: [] }]
+      parameters: [{ $ref: '#/components/parameters/code' }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                targetId: { type: string }
+      responses:
+        '200': { $ref: '#/components/responses/Game' }
+        '400': { $ref: '#/components/responses/Error' }
+        '409': { $ref: '#/components/responses/Error' }
+  /games/{code}/finish:
+    post:
+      tags: [Games]
+      summary: End voting early and show results (host)
+      security: [{ bearerAuth: [] }]
+      parameters: [{ $ref: '#/components/parameters/code' }]
+      responses:
+        '200': { $ref: '#/components/responses/Game' }
+  /games/{code}/leave:
+    post:
+      tags: [Games]
+      summary: Leave the game (host role passes on; empty games are deleted)
+      security: [{ bearerAuth: [] }]
+      parameters: [{ $ref: '#/components/parameters/code' }]
+      responses:
+        '200': { $ref: '#/components/responses/Error' }
