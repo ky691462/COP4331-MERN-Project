@@ -7,11 +7,16 @@ import { Btn, Lifted, Panel, T, Wordmark } from './ui';
 
 // Top bar for logged-in screens: logo, light/dark toggle, extra actions, log out.
 export function TopBar({ actions }: { actions?: ReactNode }) {
-  const { mode, toggleMode, signOut } = useApp();
+  const { mode, toggleMode, signOut, user, colors } = useApp();
   return (
-    <View style={{ marginBottom: 22, gap: 14 }}>
+    <View style={{ marginBottom: 32, gap: 16 }}>
       <Wordmark size={17} />
-      <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+      <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, alignItems: 'center' }}>
+        {user && (
+          <T color={colors.onStage} style={{ marginRight: 6 }}>
+            Logged in as <T weight="bold" color={colors.onStage}>{user.firstName} {user.lastName}</T>
+          </T>
+        )}
         <Btn kind="ghost" label={mode === 'dark' ? '☀ Light' : '☾ Dark'}
           accessibilityLabel={`Switch to ${mode === 'dark' ? 'light' : 'dark'} mode`} onPress={toggleMode} />
         {actions}
@@ -21,35 +26,42 @@ export function TopBar({ actions }: { actions?: ReactNode }) {
   );
 }
 
-// Login/register frame: the game table with the dealt cards, then the form panel.
+// Login/register frame, same as the website on a phone: the logo and dealt cards
+// on the game table, then the form on a sheet that runs to the bottom of the
+// screen, with the light/dark button in the sheet's corner.
+// Use inside <Screen edge>.
 const CARDS = ['pizza', 'pizza', 'pizza', 'pasta', 'pizza'];
 export function AuthFrame({ title, children }: { title: string; children: ReactNode }) {
   const { colors, mode, toggleMode } = useApp();
+  const next = mode === 'dark' ? 'light' : 'dark';
   return (
     <>
-      <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 18 }}>
-        <Wordmark size={20} />
-        <Btn kind="ghost" label={mode === 'dark' ? '☀' : '☾'}
-          accessibilityLabel={`Switch to ${mode === 'dark' ? 'light' : 'dark'} mode`} onPress={toggleMode} />
+      <View style={{ paddingHorizontal: 16, paddingTop: 32, paddingBottom: 40, gap: 20 }}>
+        <Wordmark size={24} />
+        <T size={17} color={colors.onStageSoft} style={{ maxWidth: 300 }}>
+          Everyone gets the same word except one player. Talk it out and find them.
+        </T>
+        <View style={{ flexDirection: 'row', gap: 8, paddingTop: 10 }} accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
+          {CARDS.map((w, i) => {
+            const odd = w !== 'pizza';
+            return (
+              <Lifted key={i} radius={10} bg={odd ? colors.odd : colors.paper}
+                style={{ transform: [{ rotate: odd ? '-8deg' : i % 2 ? '2deg' : '-2deg' }, { translateY: odd ? -8 : 0 }] }}
+                innerStyle={{ width: 56, height: 74, alignItems: 'center', justifyContent: 'center' }}>
+                <T weight="bold" size={12} color={odd ? colors.oddInk : colors.ink}>{w}</T>
+              </Lifted>
+            );
+          })}
+        </View>
       </View>
-      <T size={17} color={colors.onStageSoft} style={{ marginBottom: 18, maxWidth: 300 }}>
-        Everyone gets the same word except one player. Talk it out and find them.
-      </T>
-      <View style={{ flexDirection: 'row', gap: 8, marginBottom: 26 }} accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
-        {CARDS.map((w, i) => {
-          const odd = w !== 'pizza';
-          return (
-            <Lifted key={i} radius={10} bg={odd ? colors.odd : colors.paper}
-              style={{ transform: [{ rotate: odd ? '-8deg' : i % 2 ? '2deg' : '-2deg' }, { translateY: odd ? -8 : 0 }] }}
-              innerStyle={{ width: 56, height: 74, alignItems: 'center', justifyContent: 'center' }}>
-              <T weight="bold" size={12} color={odd ? colors.oddInk : colors.ink}>{w}</T>
-            </Lifted>
-          );
-        })}
-      </View>
-      <View style={{ backgroundColor: colors.paper, borderRadius: 20, padding: 22 }}>
-        <T weight="heavy" size={30} accessibilityRole="header" style={{ marginBottom: 14, lineHeight: 34 }}>{title}</T>
-        {children}
+      <View style={{ flexGrow: 1, backgroundColor: colors.paper, borderTopLeftRadius: 20, borderTopRightRadius: 20, paddingHorizontal: 16, paddingTop: 72, paddingBottom: 48 }}>
+        <Btn kind="ghost" color={colors.ink} label={mode === 'dark' ? '☀ Light' : '☾ Dark'}
+          accessibilityLabel={`Switch to ${next} mode`} onPress={toggleMode}
+          style={{ position: 'absolute', top: 16, right: 16 }} />
+        <View style={{ width: '100%', maxWidth: 400, alignSelf: 'center' }}>
+          <T weight="heavy" size={30} accessibilityRole="header" style={{ marginBottom: 14, lineHeight: 34 }}>{title}</T>
+          {children}
+        </View>
       </View>
     </>
   );

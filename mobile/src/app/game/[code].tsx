@@ -355,7 +355,7 @@ function PlayerList({ game }: { game: GameState }) {
     <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }} accessibilityLabel="Players in room">
       {game.players.map((p) => (
         <View key={p.userId} style={{ flexDirection: 'row', alignItems: 'center', borderWidth: 2, borderColor: colors.line, borderRadius: 8, backgroundColor: colors.haze, paddingHorizontal: 10, paddingVertical: 4 }}>
-          <T weight="bold">{p.nickname}{p.userId === game.you.userId ? ' (you)' : ''}</T>
+          <T weight="bold">{p.nickname}</T>
           {p.isHost && <Tag label="Host" />}
         </View>
       ))}

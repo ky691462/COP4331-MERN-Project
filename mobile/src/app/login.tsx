@@ -17,10 +17,11 @@ export default function LoginScreen() {
   const [busy, setBusy] = useState(false);
 
   async function doLogin() {
-    setBusy(true);
     setError('');
     setUnverified(false);
     setResent('');
+    if (!email.trim() || !password) return setError('Enter your email and password.');
+    setBusy(true);
     try {
       const res = await login(email.trim(), password);
       await signIn({ ...res.user, token: res.token });
@@ -40,7 +41,7 @@ export default function LoginScreen() {
   }
 
   return (
-    <Screen>
+    <Screen edge>
       <AuthFrame title="Log in">
         {params.expired && !error && !unverified && <Alert kind="info">Your session expired. Log in again to keep playing.</Alert>}
         {unverified && (
@@ -60,8 +61,7 @@ export default function LoginScreen() {
         <Link href="/forgot-password" style={{ marginTop: -4, marginBottom: 16 }}>
           <T weight="bold" size={15} color={colors.link}>Forgot your password?</T>
         </Link>
-        <Btn label={busy ? 'Logging in…' : 'Log in'} busy={busy} onPress={doLogin}
-          disabled={!email.trim() || !password} />
+        <Btn label={busy ? 'Logging in…' : 'Log in'} busy={busy} onPress={doLogin} />
         <View style={{ flexDirection: 'row', marginTop: 20, flexWrap: 'wrap' }}>
           <T color={colors.muted}>New here? </T>
           <Link href="/register"><T weight="bold" color={colors.link}>Create an account</T></Link>

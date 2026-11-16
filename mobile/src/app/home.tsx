@@ -40,8 +40,10 @@ export default function HomeScreen() {
   if (!user) return <Redirect href="/login" />;
 
   async function doHost() {
-    setHosting(true);
     setHostMsg('');
+    if (themes.length === 0) return setHostMsg('Could not load the word themes. Pull down or reopen to try again.');
+    if (!hostNick.trim()) return setHostMsg('Enter a nickname.');
+    setHosting(true);
     try {
       const game = await createGame(theme, hostNick.trim());
       router.push({ pathname: '/game/[code]', params: { code: game.code } });
@@ -55,6 +57,7 @@ export default function HomeScreen() {
   async function doJoin() {
     setJoinMsg('');
     const code = joinCode.trim().toUpperCase();
+    if (!code || !nickname.trim()) return setJoinMsg('Enter a room code and a nickname.');
     if (!/^[A-Z0-9]{4,8}$/.test(code)) return setJoinMsg('Room codes are 4–8 letters or numbers.');
     setJoining(true);
     try {
@@ -79,8 +82,7 @@ export default function HomeScreen() {
         <T color={colors.muted} style={{ marginBottom: 14 }}>Pick a theme for the secret words, then share your room code.</T>
         {themes.length > 0 && <ThemePicker themes={themes} value={theme} onChange={setTheme} />}
         <Field label="Your nickname" value={hostNick} onChangeText={setHostNick} maxLength={20} />
-        <Btn label={hosting ? 'Creating room…' : 'Create room'} busy={hosting} onPress={doHost}
-          disabled={themes.length === 0 || !hostNick.trim()} />
+        <Btn label={hosting ? 'Creating room…' : 'Create room'} busy={hosting} onPress={doHost} />
         {!!hostMsg && <View style={{ marginTop: 16 }}><Alert kind="error">{hostMsg}</Alert></View>}
       </Panel>
 
@@ -91,8 +93,7 @@ export default function HomeScreen() {
           onChangeText={(v) => setJoinCode(v.toUpperCase())}
           style={{ letterSpacing: 4, fontFamily: 'BricolageGrotesque_800ExtraBold' }} />
         <Field label="Nickname" value={nickname} onChangeText={setNickname} maxLength={20} onSubmitEditing={doJoin} />
-        <Btn label={joining ? 'Joining…' : 'Join room'} busy={joining} onPress={doJoin}
-          disabled={!joinCode.trim() || !nickname.trim()} />
+        <Btn label={joining ? 'Joining…' : 'Join room'} busy={joining} onPress={doJoin} />
         {!!joinMsg && <View style={{ marginTop: 16 }}><Alert kind="error">{joinMsg}</Alert></View>}
       </Panel>
 

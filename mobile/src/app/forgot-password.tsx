@@ -15,15 +15,16 @@ export default function ForgotPasswordScreen() {
   const [busy, setBusy] = useState(false);
 
   async function doSend() {
-    setBusy(true);
     setError('');
+    if (!email.trim()) return setError('Enter your email.');
+    setBusy(true);
     try { setSent((await forgotPassword(email.trim())).message); }
     catch (err) { setError(err instanceof Error ? err.message : 'Something went wrong.'); }
     finally { setBusy(false); }
   }
 
   return (
-    <Screen>
+    <Screen edge>
       <AuthFrame title="Reset your password">
         {sent ? <Alert kind="success">{sent}</Alert> : (
           <>
@@ -33,7 +34,7 @@ export default function ForgotPasswordScreen() {
             <Field label="Email" value={email} onChangeText={setEmail} keyboardType="email-address"
               autoCapitalize="none" autoComplete="email" />
             {!!error && <Alert kind="error">{error}</Alert>}
-            <Btn label={busy ? 'Sending…' : 'Send reset link'} busy={busy} onPress={doSend} disabled={!email.trim()} />
+            <Btn label={busy ? 'Sending…' : 'Send reset link'} busy={busy} onPress={doSend} />
           </>
         )}
         <View style={{ flexDirection: 'row', marginTop: 20 }}>

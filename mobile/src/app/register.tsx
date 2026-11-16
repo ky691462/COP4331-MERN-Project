@@ -42,7 +42,7 @@ export default function RegisterScreen() {
 
   if (done) {
     return (
-      <Screen>
+      <Screen edge>
         <AuthFrame title="Check your email">
           <Alert kind={done.emailSent ? 'success' : 'error'}>
             {done.emailSent
@@ -61,7 +61,7 @@ export default function RegisterScreen() {
   }
 
   return (
-    <Screen>
+    <Screen edge>
       <AuthFrame title="Create an account">
         <Field label="First name" value={firstName} onChangeText={setFirstName} autoComplete="given-name" textContentType="givenName" />
         <Field label="Last name" value={lastName} onChangeText={setLastName} autoComplete="family-name" textContentType="familyName" />

@@ -77,8 +77,8 @@ export function CodeTiles({ code }: { code: string }) {
 }
 
 // ---------- Buttons ----------
-export function Btn({ label, onPress, kind = 'primary', disabled = false, busy = false, style, accessibilityLabel }: {
-  label: string; onPress: () => void; kind?: 'primary' | 'secondary' | 'ghost';
+export function Btn({ label, onPress, kind = 'primary', disabled = false, busy = false, style, accessibilityLabel, color }: {
+  label: string; onPress: () => void; kind?: 'primary' | 'secondary' | 'ghost'; color?: string;
   disabled?: boolean; busy?: boolean; style?: StyleProp<ViewStyle>; accessibilityLabel?: string;
 }) {
   const { colors } = useApp();
@@ -87,8 +87,8 @@ export function Btn({ label, onPress, kind = 'primary', disabled = false, busy =
   if (kind === 'ghost') {
     return (
       <Pressable onPress={onPress} disabled={off} accessibilityRole="button" accessibilityLabel={accessibilityLabel ?? label}
-        style={({ pressed }) => [styles.ghost, { borderColor: colors.onStage, opacity: pressed || off ? 0.7 : 1 }, style]}>
-        <T weight="heavy" size={14} color={colors.onStage}>{label}</T>
+        style={({ pressed }) => [styles.ghost, { borderColor: color ?? colors.onStage, opacity: pressed || off ? 0.7 : 1 }, style]}>
+        <T weight="heavy" size={15} color={color ?? colors.onStage}>{label}</T>
       </Pressable>
     );
   }
@@ -172,12 +172,13 @@ export function Tag({ label, odd = false }: { label: string; odd?: boolean }) {
 }
 
 // ---------- Screen frame: game table background, safe areas, scrolling ----------
-export function Screen({ children, top }: { children: ReactNode; top?: ReactNode }) {
+// `edge` drops the padding so a child can run edge to edge and down to the bottom (login sheet).
+export function Screen({ children, top, edge = false }: { children: ReactNode; top?: ReactNode; edge?: boolean }) {
   const { colors, holiday } = useApp();
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.stage }} edges={['top', 'left', 'right']}>
       <HolidayDecor themeId={holiday} />
-      <ScrollView contentContainerStyle={styles.screen} keyboardShouldPersistTaps="handled">
+      <ScrollView contentContainerStyle={edge ? styles.edge : styles.screen} keyboardShouldPersistTaps="handled">
         {top}
         {children}
       </ScrollView>
@@ -206,8 +207,9 @@ function HolidayDecor({ themeId }: { themeId: string | null }) {
 
 const styles = StyleSheet.create({
   screen: { padding: 16, paddingBottom: 48, maxWidth: 640, width: '100%', alignSelf: 'center' },
+  edge: { flexGrow: 1 },
   btn: { minHeight: 52, paddingHorizontal: 18, alignItems: 'center', justifyContent: 'center' },
-  ghost: { borderWidth: 2, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 7 },
+  ghost: { borderWidth: 2, borderRadius: 10, paddingHorizontal: 14, paddingVertical: 9 },
   input: { fontFamily: fonts.regular, fontSize: 16, borderWidth: 2, borderRadius: 10, paddingHorizontal: 14, paddingVertical: 12 },
   alert: { borderWidth: 2, borderRadius: 10, padding: 14, marginBottom: 16, gap: 10 },
   chip: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 12, paddingVertical: 5 },
