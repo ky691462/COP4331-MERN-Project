@@ -5,7 +5,7 @@ import QRCode from 'react-native-qrcode-svg';
 import { Alert, Btn, Chip, CodeTiles, H1, H2, Lifted, Panel, Screen, T, Tag } from '@/components/ui';
 import { ThemePicker, TopBar } from '@/components/parts';
 import {
-  castVote, finishVoting, getThemes, leaveGame, openVoting, setGameTheme, startRound, WEB_URL,
+  ApiError, castVote, finishVoting, getThemes, leaveGame, openVoting, setGameTheme, startRound, WEB_URL,
   type GameState, type Theme,
 } from '@/lib/api';
 import { useApp, useHolidaySkin } from '@/lib/app-context';
@@ -13,11 +13,14 @@ import { useGame } from '@/lib/useGame';
 
 // One screen for the whole game; what it shows follows game.status:
 // lobby -> reveal (see your word, give clues out loud) -> voting -> results -> next round.
+const TOO_LATE = 'The game moved on before that went through, so your screen has been updated.';
+
 export default function GameScreen() {
   const { code = '' } = useLocalSearchParams<{ code: string }>();
   const { user, colors } = useApp();
-  const { game, apply, gone, offline } = useGame(String(code).toUpperCase());
-  const [error, setError] = useState('');
+  const { game, apply, gone, offline, refresh } = useGame(String(code).toUpperCase());
+  // An action's error stays up only while the game is still on the screen it happened on.
+  const [error, setError] = useState<{ msg: string; at: GameState['status'] } | null>(null);
   const [busy, setBusy] = useState(false);
   const [themes, setThemes] = useState<Theme[]>([]);
   useHolidaySkin(game?.theme.id);
@@ -28,12 +31,28 @@ export default function GameScreen() {
 
   if (!user) return <Redirect href="/login" />;
 
+  // Run a game action; its reply replaces the state right away.
+  // If the game already moved on (e.g. a vote tapped just as voting closed),
+  // show the latest screen with a plain note instead of the server's error.
   async function act(action: () => Promise<GameState>) {
+    if (!game) return;
+    const was = game.status;
     setBusy(true);
-    setError('');
-    try { apply(await action()); }
-    catch (err) { setError(err instanceof Error ? err.message : 'Something went wrong.'); }
-    finally { setBusy(false); }
+    setError(null);
+    try {
+      apply(await action());
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Something went wrong.';
+      if (err instanceof ApiError && err.status === 409) {
+        const latest = await refresh();
+        const now = latest?.status ?? was;
+        setError({ msg: now !== was ? TOO_LATE : msg, at: now });
+      } else {
+        setError({ msg, at: was });
+      }
+    } finally {
+      setBusy(false);
+    }
   }
 
   async function doLeave() {
@@ -69,7 +88,7 @@ export default function GameScreen() {
       </View>
 
       {offline && <Alert kind="info">Reconnecting to the server…</Alert>}
-      {!!error && <Alert kind="error">{error}</Alert>}
+      {!!error && error.at === game.status && <Alert kind="error">{error.msg}</Alert>}
 
       {game.status === 'lobby' && (
         <Lobby game={game} themes={themes} busy={busy} hostName={hostName}

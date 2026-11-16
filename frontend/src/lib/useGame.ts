@@ -12,16 +12,18 @@ export function useGame(code: string) {
   const [offline, setOffline] = useState(false);
   const alive = useRef(true);
 
-  const refresh = useCallback(async () => {
+  const refresh = useCallback(async (): Promise<GameState | null> => {
     try {
       const next = await getGame(code);
-      if (!alive.current) return;
+      if (!alive.current) return null;
       setGame(next);
       setOffline(false);
+      return next;
     } catch (err) {
-      if (!alive.current) return;
+      if (!alive.current) return null;
       if (err instanceof ApiError && (err.status === 404 || err.status === 403)) setGone(err.message);
       else setOffline(true);
+      return null;
     }
   }, [code]);
 

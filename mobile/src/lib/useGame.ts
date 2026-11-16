@@ -13,16 +13,18 @@ export function useGame(code: string) {
   const alive = useRef(true);
   const active = useRef(AppState.currentState === 'active' || AppState.currentState == null);
 
-  const refresh = useCallback(async () => {
+  const refresh = useCallback(async (): Promise<GameState | null> => {
     try {
       const next = await getGame(code);
-      if (!alive.current) return;
+      if (!alive.current) return null;
       setGame(next);
       setOffline(false);
+      return next;
     } catch (err) {
-      if (!alive.current) return;
+      if (!alive.current) return null;
       if (err instanceof ApiError && (err.status === 404 || err.status === 403)) setGone(err.message);
       else if (!(err instanceof ApiError && err.status === 401)) setOffline(true);
+      return null;
     }
   }, [code]);
 
@@ -42,5 +44,5 @@ export function useGame(code: string) {
     };
   }, [refresh]);
 
-  return { game, apply: setGame, gone, offline };
+  return { game, apply: setGame, gone, offline, refresh };
 }

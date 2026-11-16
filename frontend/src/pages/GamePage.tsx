@@ -6,7 +6,7 @@ import JoinQR from '../components/JoinQR';
 import ThemePicker from '../components/ThemePicker';
 import HolidayDecor from '../components/HolidayDecor';
 import {
-  castVote, finishVoting, getThemes, leaveGame, openVoting, setGameTheme, startRound,
+  ApiError, castVote, finishVoting, getThemes, leaveGame, openVoting, setGameTheme, startRound,
   type GameState, type Theme,
 } from '../lib/api';
 import { useGame } from '../lib/useGame';
@@ -15,11 +15,14 @@ import { useIdleLogout } from '../lib/useIdleLogout';
 
 // One page for the whole game; what it shows follows game.status:
 // lobby -> reveal (see your word, give clues out loud) -> voting -> results -> next round.
+const TOO_LATE = 'The game moved on before that went through, so your screen has been updated.';
+
 function GamePage() {
   const { code = '' } = useParams();
   const navigate = useNavigate();
-  const { game, apply, gone, offline } = useGame(code.toUpperCase());
-  const [error, setError] = useState('');
+  const { game, apply, gone, offline, refresh } = useGame(code.toUpperCase());
+  // An action's error stays up only while the game is still on the screen it happened on.
+  const [error, setError] = useState<{ msg: string; at: GameState['status'] } | null>(null);
   const [busy, setBusy] = useState(false);
   const [themes, setThemes] = useState<Theme[]>([]);
   useIdleLogout();
@@ -30,13 +33,24 @@ function GamePage() {
   }, []);
 
   // Run a game action; its reply replaces the state right away.
+  // If the game already moved on (e.g. a vote tapped just as voting closed),
+  // show the latest screen with a plain note instead of the server's error.
   async function act(action: () => Promise<GameState>) {
+    if (!game) return;
+    const was = game.status;
     setBusy(true);
-    setError('');
+    setError(null);
     try {
       apply(await action());
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Something went wrong.');
+      const msg = err instanceof Error ? err.message : 'Something went wrong.';
+      if (err instanceof ApiError && err.status === 409) {
+        const latest = await refresh();
+        const now = latest?.status ?? was;
+        setError({ msg: now !== was ? TOO_LATE : msg, at: now });
+      } else {
+        setError({ msg, at: was });
+      }
     } finally {
       setBusy(false);
     }
@@ -89,7 +103,7 @@ function GamePage() {
         </div>
 
         {offline && <div className="alert alert-info" role="status">Reconnecting to the server…</div>}
-        {error && <div className="alert alert-error" role="alert">{error}</div>}
+        {error && error.at === game.status && <div className="alert alert-error" role="alert">{error.msg}</div>}
 
         {game.status === 'lobby' && (
           <Lobby game={game} themes={themes} busy={busy} hostName={hostName}
